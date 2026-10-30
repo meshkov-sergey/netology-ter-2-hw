@@ -1,32 +1,32 @@
-# Три одинаковых диска размером 1 ГБ через count
 resource "yandex_compute_disk" "storage_disk" {
   count = 3
 
   name = "storage-disk-${count.index + 1}"
-  type = "network-hdd"
+  type = var.vm_storage_disk_type
   zone = var.default_zone
-  size = 1
+  size = var.vm_additional_disk_size
 }
 
-# Одиночная ВМ storage с динамическим подключением дисков
 resource "yandex_compute_instance" "storage" {
   name        = "storage"
-  platform_id = "standard-v2"
+  hostname    = "storage"
+  platform_id = var.vm_platform_id
   zone        = var.default_zone
 
   resources {
-    cores         = 2
-    memory        = 2
-    core_fraction = 5
+    cores         = var.vm_cores
+    memory        = var.vm_memory
+    core_fraction = var.vm_core_fraction
   }
 
   boot_disk {
     initialize_params {
       image_id = data.yandex_compute_image.ubuntu.image_id
+      size     = var.vm_storage_disk_size
+      type     = var.vm_storage_disk_type
     }
   }
 
-  # Динамический блок для подключения дополнительных дисков
   dynamic "secondary_disk" {
     for_each = yandex_compute_disk.storage_disk
     content {
@@ -35,17 +35,17 @@ resource "yandex_compute_instance" "storage" {
   }
 
   scheduling_policy {
-    preemptible = true
+    preemptible = var.vm_preemptible
   }
 
   network_interface {
     subnet_id          = yandex_vpc_subnet.develop.id
     security_group_ids = [yandex_vpc_security_group.example.id]
-    nat                = true
+    nat                = var.vm_nat
   }
 
   metadata = {
     serial-port-enable = 1
-    ssh-keys           = local.ssh_key
+    ssh-keys           = "ubuntu:${local.ssh_key}"
   }
 }
